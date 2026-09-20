@@ -54,6 +54,7 @@ export const spotifyApi = {
   getFollowedArtists: (token, limit = 50) =>
     request(token, '/me/following', { params: { type: 'artist', limit } }),
   getArtistTopTracks: (token, artistId) => request(token, `/artists/${artistId}/top-tracks`),
+  getArtists: (token, ids) => request(token, '/artists', { params: { ids: ids.join(',') } }),
   getNewReleases: (token, limit = 50) => request(token, '/browse/new-releases', { params: { limit } }),
   getRecentlyPlayed: (token, limit = 50) => request(token, '/me/player/recently-played', { params: { limit } }),
   play: (token, deviceId, uris) =>

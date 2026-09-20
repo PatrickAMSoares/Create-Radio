@@ -1,5 +1,5 @@
 import { useCallback, useRef, useState } from 'react'
-import { buildCandidatePool, generateQueue, reshuffleQueue } from '../lib/queueEngine'
+import { buildCandidatePool, filterPoolByGenres, generateQueue, reshuffleQueue } from '../lib/queueEngine'
 import { spotifyApi } from '../lib/spotifyApi'
 import { loadHistory, pushHistory } from '../lib/historyStore'
 import { RadioError, ERROR_MESSAGES } from '../lib/errors'
@@ -25,21 +25,35 @@ export function useRadio({ accessToken, deviceId, settings }) {
     return pool
   }, [accessToken, settings.sources])
 
-  const buildQueue = useCallback(async () => {
-    let pool = poolRef.current
-    if (pool.length < QUEUE_SIZE) pool = await refillPool()
-    if (!pool.length) throw new RadioError('NO_TRACKS_FOUND', ERROR_MESSAGES.NO_TRACKS_FOUND)
-    return generateQueue(
-      pool,
-      {
-        familiaridade: settings.familiaridade,
-        variedade: settings.variedade,
-        repeticao: settings.repeticao,
-        size: QUEUE_SIZE,
-      },
-      historyIdsRef.current,
-    )
-  }, [refillPool, settings])
+  const buildQueue = useCallback(
+    async (overrides = {}) => {
+      // "overrides" permite atalhos (ex.: botão Descobrir) gerarem uma fila
+      // com um viés pontual, sem alterar as preferências salvas do usuário.
+      let pool
+      if (overrides.sources) {
+        pool = await buildCandidatePool(accessToken, overrides.sources)
+      } else {
+        pool = poolRef.current
+        if (pool.length < QUEUE_SIZE) pool = await refillPool()
+      }
+      if (!pool.length) throw new RadioError('NO_TRACKS_FOUND', ERROR_MESSAGES.NO_TRACKS_FOUND)
+
+      const generos = overrides.generos ?? settings.generos
+      if (generos?.length) pool = await filterPoolByGenres(accessToken, pool, generos)
+
+      return generateQueue(
+        pool,
+        {
+          familiaridade: overrides.familiaridade ?? settings.familiaridade,
+          variedade: overrides.variedade ?? settings.variedade,
+          repeticao: overrides.repeticao ?? settings.repeticao,
+          size: QUEUE_SIZE,
+        },
+        historyIdsRef.current,
+      )
+    },
+    [accessToken, refillPool, settings],
+  )
 
   const playTrack = useCallback(
     async (track, { recordPrevious = true } = {}) => {
@@ -64,20 +78,28 @@ export function useRadio({ accessToken, deviceId, settings }) {
     [accessToken, deviceId],
   )
 
-  const start = useCallback(async () => {
-    setLoading(true)
-    setError(null)
-    try {
-      const newQueue = await buildQueue()
-      const [first, ...rest] = newQueue
-      setQueue(rest)
-      await playTrack(first)
-    } catch (err) {
-      setError(err instanceof RadioError ? err.message : ERROR_MESSAGES.PLAYBACK_FAILED)
-    } finally {
-      setLoading(false)
-    }
-  }, [buildQueue, playTrack])
+  const start = useCallback(
+    async (overrides) => {
+      setLoading(true)
+      setError(null)
+      try {
+        const newQueue = await buildQueue(overrides)
+        const [first, ...rest] = newQueue
+        setQueue(rest)
+        await playTrack(first)
+      } catch (err) {
+        setError(err instanceof RadioError ? err.message : ERROR_MESSAGES.PLAYBACK_FAILED)
+      } finally {
+        setLoading(false)
+      }
+    },
+    [buildQueue, playTrack],
+  )
+
+  const startDiscovery = useCallback(
+    () => start({ sources: { discovery: true }, familiaridade: 'descobertas' }),
+    [start],
+  )
 
   const playNext = useCallback(async () => {
     setError(null)
@@ -145,6 +167,7 @@ export function useRadio({ accessToken, deviceId, settings }) {
     loading,
     error,
     start,
+    startDiscovery,
     playNext,
     playPrevious,
     togglePause,

@@ -242,6 +242,14 @@ img {
   color: var(--text-muted);
   border: 1px solid var(--border);
 }
+.btn--secondary {
+  background: transparent;
+  color: var(--accent-strong);
+  border: 1px solid var(--accent);
+}
+.btn--secondary:hover:not(:disabled) {
+  background: rgba(108, 92, 231, 0.12);
+}
 .btn--large {
   padding: 14px 28px;
   font-size: 1rem;

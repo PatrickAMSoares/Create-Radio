@@ -9,6 +9,7 @@ export const DEFAULT_SETTINGS = {
     discovery: false,
     popular: false,
   },
+  generos: [],
   familiaridade: 'equilibrado',
   variedade: 'media',
   repeticao: 'evitar',

@@ -81,10 +81,24 @@ export function RadioPage({ auth }) {
               disabled={controlsDisabled}
             />
           ) : (
-            <button type="button" className="btn btn--primary btn--large" onClick={radio.start} disabled={controlsDisabled}>
+            <button
+              type="button"
+              className="btn btn--primary btn--large"
+              onClick={() => radio.start()}
+              disabled={controlsDisabled}
+            >
               {radio.loading ? 'Preparando…' : '▶️ Iniciar Rádio'}
             </button>
           )}
+
+          <button
+            type="button"
+            className="btn btn--secondary btn--large"
+            onClick={radio.startDiscovery}
+            disabled={controlsDisabled}
+          >
+            🔍 Descobrir músicas novas
+          </button>
 
           <QueueList queue={radio.queue} />
         </div>

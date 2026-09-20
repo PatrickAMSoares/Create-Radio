@@ -86,6 +86,64 @@ async function collectDiscovery(token) {
   return tag([...albumTracks, ...artistTracks], 'discovery')
 }
 
+// Rótulos em português mapeados para os termos que aparecem nos gêneros
+// crus retornados pela Web API (ex.: artista pode ter "modern rock",
+// "sertanejo universitario", "edm" etc. — por isso o match é por substring).
+export const GENRE_STYLES = [
+  { key: 'pop', label: 'Pop', keywords: ['pop'] },
+  { key: 'rock', label: 'Rock', keywords: ['rock'] },
+  { key: 'hiphop', label: 'Hip-Hop / Rap', keywords: ['hip hop', 'rap', 'trap'] },
+  { key: 'eletronica', label: 'Eletrônica', keywords: ['edm', 'electro', 'house', 'techno', 'trance', 'dubstep'] },
+  { key: 'sertanejo', label: 'Sertanejo', keywords: ['sertanejo'] },
+  { key: 'mpb', label: 'MPB', keywords: ['mpb', 'musica popular brasileira'] },
+  { key: 'samba', label: 'Samba / Pagode', keywords: ['samba', 'pagode'] },
+  { key: 'funk', label: 'Funk', keywords: ['funk'] },
+  { key: 'forro', label: 'Forró', keywords: ['forro', 'forró'] },
+  { key: 'reggae', label: 'Reggae', keywords: ['reggae'] },
+  { key: 'jazz', label: 'Jazz', keywords: ['jazz'] },
+  { key: 'classica', label: 'Clássica', keywords: ['classical'] },
+  { key: 'metal', label: 'Metal', keywords: ['metal'] },
+  { key: 'indie', label: 'Indie', keywords: ['indie'] },
+  { key: 'rnb', label: 'R&B / Soul', keywords: ['r&b', 'soul'] },
+  { key: 'gospel', label: 'Gospel', keywords: ['gospel'] },
+]
+
+// Cache em memória (dura a sessão do navegador): gênero de artista é dado
+// praticamente imutável, não vale a pena buscar de novo a cada fila gerada.
+const artistGenreCache = new Map()
+
+async function fetchArtistGenres(token, artistIds) {
+  const uncached = artistIds.filter((id) => !artistGenreCache.has(id))
+  const chunks = []
+  for (let i = 0; i < uncached.length; i += 50) chunks.push(uncached.slice(i, i + 50))
+  const results = await Promise.all(chunks.map((ids) => spotifyApi.getArtists(token, ids).catch(() => null)))
+  for (const r of results) {
+    for (const artist of r?.artists || []) {
+      if (artist) artistGenreCache.set(artist.id, artist.genres || [])
+    }
+  }
+  const map = new Map()
+  for (const id of artistIds) map.set(id, artistGenreCache.get(id) || [])
+  return map
+}
+
+export async function filterPoolByGenres(token, pool, selectedStyleKeys) {
+  if (!selectedStyleKeys?.length) return pool
+  const keywords = selectedStyleKeys.flatMap((key) => GENRE_STYLES.find((s) => s.key === key)?.keywords || [])
+  if (!keywords.length) return pool
+
+  const artistIds = [...new Set(pool.map((t) => t.artists?.[0]?.id).filter(Boolean))]
+  const genresByArtist = await fetchArtistGenres(token, artistIds)
+
+  const filtered = pool.filter((t) => {
+    const genres = genresByArtist.get(t.artists?.[0]?.id) || []
+    return genres.some((g) => keywords.some((kw) => g.includes(kw)))
+  })
+  // Sem faixa nenhuma bate com o estilo escolhido (ex.: conta sem nada nesse
+  // gênero) — melhor devolver o pool inteiro do que travar a rádio.
+  return filtered.length ? filtered : pool
+}
+
 const COLLECTORS = {
   savedTracks: collectSavedTracks,
   topArtists: collectTopArtistsTracks,

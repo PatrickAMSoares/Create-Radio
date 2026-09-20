@@ -1,3 +1,5 @@
+import { GENRE_STYLES } from '../lib/queueEngine'
+
 const SOURCE_OPTIONS = [
   { key: 'savedTracks', label: '🎵 Músicas salvas' },
   { key: 'topArtists', label: '🎤 Artistas favoritos' },
@@ -34,6 +36,12 @@ export function RadioSettingsPanel({ settings, onChange }) {
   const setField = (field, value) => onChange({ ...settings, [field]: value })
   const anySourceActive = Object.values(settings.sources).some(Boolean)
 
+  const toggleGenre = (key) => {
+    const current = settings.generos || []
+    const generos = current.includes(key) ? current.filter((g) => g !== key) : [...current, key]
+    onChange({ ...settings, generos })
+  }
+
   return (
     <section className="settings-panel">
       <h3>Configurar Rádio</h3>
@@ -64,6 +72,23 @@ export function RadioSettingsPanel({ settings, onChange }) {
         {!anySourceActive && (
           <p className="hint">Sem fontes selecionadas: a rádio vai misturar tudo que encontrar na sua conta.</p>
         )}
+      </div>
+
+      <div className="settings-group">
+        <p className="settings-label">Estilos musicais</p>
+        <div className="chip-grid">
+          {GENRE_STYLES.map((style) => (
+            <button
+              key={style.key}
+              type="button"
+              className={`chip ${settings.generos?.includes(style.key) ? 'chip--active' : ''}`}
+              onClick={() => toggleGenre(style.key)}
+            >
+              {style.label}
+            </button>
+          ))}
+        </div>
+        {!settings.generos?.length && <p className="hint">Nenhum estilo escolhido: a rádio não filtra por gênero.</p>}
       </div>
 
       <RadioGroup
