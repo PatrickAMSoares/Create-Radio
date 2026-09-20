@@ -1,9 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { buildAuthorizeUrl, consumeAuthState, exchangeCodeForSession, refreshSession, endSession } from '../lib/spotifyAuth'
+import { buildAuthorizeUrl, consumeAuthState, exchangeCodeForTokens, refreshTokens } from '../lib/spotifyAuth'
 import { spotifyApi } from '../lib/spotifyApi'
 import { RadioError, ERROR_MESSAGES } from '../lib/errors'
 
-const SESSION_KEY = 'radio_session_id'
+// Sem backend, o refresh_token só pode ficar no navegador (é o trade-off
+// padrão do fluxo PKCE para apps sem servidor). O access_token de curta
+// duração nunca é persistido, só o refresh_token guardado em localStorage.
+const REFRESH_TOKEN_KEY = 'radio_refresh_token'
 
 export function useAuth() {
   const [accessToken, setAccessToken] = useState(null)
@@ -11,25 +14,25 @@ export function useAuth() {
   const [status, setStatus] = useState('idle') // idle | loading | authenticated | error
   const [error, setError] = useState(null)
   const refreshTimer = useRef(null)
-  const sessionIdRef = useRef(localStorage.getItem(SESSION_KEY))
 
-  const scheduleRefresh = useCallback((sessionId, expiresIn) => {
+  const scheduleRefresh = useCallback((refreshToken, expiresIn) => {
     clearTimeout(refreshTimer.current)
     const delay = Math.max((expiresIn - 60) * 1000, 10000)
-    refreshTimer.current = setTimeout(() => doRefresh(sessionId), delay)
+    refreshTimer.current = setTimeout(() => doRefresh(refreshToken), delay)
     // eslint-disable-next-line no-use-before-define
   }, [])
 
   const doRefresh = useCallback(
-    async (sessionId) => {
+    async (refreshToken) => {
       try {
-        const { accessToken: token, expiresIn } = await refreshSession(sessionId)
-        setAccessToken(token)
+        const data = await refreshTokens(refreshToken)
+        setAccessToken(data.access_token)
+        const nextRefreshToken = data.refresh_token || refreshToken
+        localStorage.setItem(REFRESH_TOKEN_KEY, nextRefreshToken)
         setStatus('authenticated')
-        scheduleRefresh(sessionId, expiresIn)
+        scheduleRefresh(nextRefreshToken, data.expires_in)
       } catch (err) {
-        sessionIdRef.current = null
-        localStorage.removeItem(SESSION_KEY)
+        localStorage.removeItem(REFRESH_TOKEN_KEY)
         setAccessToken(null)
         setProfile(null)
         setStatus('error')
@@ -40,13 +43,13 @@ export function useAuth() {
   )
 
   useEffect(() => {
-    const sessionId = sessionIdRef.current
-    if (!sessionId) {
+    const stored = localStorage.getItem(REFRESH_TOKEN_KEY)
+    if (!stored) {
       setStatus('idle')
       return
     }
     setStatus('loading')
-    doRefresh(sessionId)
+    doRefresh(stored)
     return () => clearTimeout(refreshTimer.current)
   }, [doRefresh])
 
@@ -58,8 +61,8 @@ export function useAuth() {
     spotifyApi.getMe(accessToken).then(setProfile).catch(() => {})
   }, [accessToken])
 
-  const login = useCallback(() => {
-    window.location.href = buildAuthorizeUrl()
+  const login = useCallback(async () => {
+    window.location.href = await buildAuthorizeUrl()
   }, [])
 
   const completeLogin = useCallback(
@@ -72,12 +75,11 @@ export function useAuth() {
         return false
       }
       try {
-        const { accessToken: token, expiresIn, sessionId } = await exchangeCodeForSession(code)
-        sessionIdRef.current = sessionId
-        localStorage.setItem(SESSION_KEY, sessionId)
-        setAccessToken(token)
+        const data = await exchangeCodeForTokens(code)
+        localStorage.setItem(REFRESH_TOKEN_KEY, data.refresh_token)
+        setAccessToken(data.access_token)
         setStatus('authenticated')
-        scheduleRefresh(sessionId, expiresIn)
+        scheduleRefresh(data.refresh_token, data.expires_in)
         return true
       } catch (err) {
         setStatus('error')
@@ -88,11 +90,9 @@ export function useAuth() {
     [scheduleRefresh],
   )
 
-  const logout = useCallback(async () => {
+  const logout = useCallback(() => {
     clearTimeout(refreshTimer.current)
-    await endSession(sessionIdRef.current)
-    sessionIdRef.current = null
-    localStorage.removeItem(SESSION_KEY)
+    localStorage.removeItem(REFRESH_TOKEN_KEY)
     setAccessToken(null)
     setProfile(null)
     setStatus('idle')

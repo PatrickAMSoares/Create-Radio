@@ -2,6 +2,3 @@ node_modules
 dist
 .env
 .env.local
-functions/node_modules
-firebase-debug.log
-.firebase

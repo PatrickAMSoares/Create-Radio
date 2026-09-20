@@ -22,9 +22,10 @@ export function CallbackPage({ onComplete }) {
         const ok = await onComplete(code, state)
         setMessage(ok ? 'Conectado! Redirecionando…' : 'Não foi possível concluir a autenticação com o Spotify.')
       }
-      window.history.replaceState({}, '', '/')
+      const home = import.meta.env.BASE_URL
+      window.history.replaceState({}, '', home)
       setTimeout(() => {
-        window.location.href = '/'
+        window.location.href = home
       }, 800)
     }
     run()

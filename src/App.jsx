@@ -5,7 +5,8 @@ import { CallbackPage } from './pages/CallbackPage'
 export function App() {
   const auth = useAuth()
 
-  if (window.location.pathname === '/callback') {
+  // Robusto a subpath (ex.: GitHub Pages serve em /Create-Radio/callback).
+  if (window.location.pathname.endsWith('/callback')) {
     return <CallbackPage onComplete={auth.completeLogin} />
   }
 
