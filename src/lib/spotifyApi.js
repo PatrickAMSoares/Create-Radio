@@ -57,6 +57,7 @@ export const spotifyApi = {
   getArtists: (token, ids) => request(token, '/artists', { params: { ids: ids.join(',') } }),
   getNewReleases: (token, limit = 50) => request(token, '/browse/new-releases', { params: { limit } }),
   getRecentlyPlayed: (token, limit = 50) => request(token, '/me/player/recently-played', { params: { limit } }),
+  getDevices: (token) => request(token, '/me/player/devices'),
   play: (token, deviceId, uris) =>
     request(token, '/me/player/play', { method: 'PUT', params: { device_id: deviceId }, body: { uris } }),
   pause: (token, deviceId) => request(token, '/me/player/pause', { method: 'PUT', params: { device_id: deviceId } }),

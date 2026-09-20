@@ -8,7 +8,9 @@ import { RadioSettingsPanel } from '../components/RadioSettingsPanel'
 import { HistoryPanel } from '../components/HistoryPanel'
 import { Toast } from '../components/Toast'
 import { usePlayer } from '../hooks/usePlayer'
+import { useDevices } from '../hooks/useDevices'
 import { useRadio } from '../hooks/useRadio'
+import { DeviceSelector } from '../components/DeviceSelector'
 import { loadSettings, saveSettings } from '../lib/settingsStore'
 import { loadHistory, clearHistory } from '../lib/historyStore'
 
@@ -17,16 +19,34 @@ export function RadioPage({ auth }) {
   const isPremium = profile?.product === 'premium'
   const [settings, setSettings] = useState(loadSettings())
   const [history, setHistory] = useState(loadHistory())
+  const [selectedDeviceId, setSelectedDeviceId] = useState(null)
   const lastPositionRef = useRef(0)
 
   useEffect(() => saveSettings(settings), [settings])
 
-  const { deviceId, isReady, playbackState, playerError, setPlayerError } = usePlayer(accessToken, isPremium)
-  const radio = useRadio({ accessToken, deviceId, settings })
+  const { deviceId: ownDeviceId, playbackState, playerError, setPlayerError } = usePlayer(accessToken, isPremium)
+  const { devices, refreshDevices } = useDevices(accessToken)
+
+  // Prioriza o player do próprio navegador assim que ele fica pronto; se ele
+  // nunca ficar (ex.: celular, onde o Web Playback SDK não funciona), cai
+  // para o dispositivo Spotify Connect que já estiver ativo (ex.: app do
+  // Spotify aberto no celular).
+  useEffect(() => {
+    if (selectedDeviceId) return
+    if (ownDeviceId) {
+      setSelectedDeviceId(ownDeviceId)
+      return
+    }
+    const active = devices.find((d) => d.is_active)
+    if (active) setSelectedDeviceId(active.id)
+  }, [ownDeviceId, devices, selectedDeviceId])
+
+  const radio = useRadio({ accessToken, deviceId: selectedDeviceId, settings })
 
   useEffect(() => {
     if (!radio.current) return
     setHistory(loadHistory())
+    refreshDevices()
   }, [radio.current])
 
   // O SDK não avança faixas automaticamente porque tocamos uma faixa por vez
@@ -51,7 +71,7 @@ export function RadioPage({ auth }) {
     return <LoginScreen onLogin={login} loading={status === 'loading'} error={authError} />
   }
 
-  const controlsDisabled = !isReady || !isPremium || radio.loading
+  const controlsDisabled = !selectedDeviceId || !isPremium || radio.loading
 
   return (
     <div className="app-shell">
@@ -68,6 +88,14 @@ export function RadioPage({ auth }) {
               indisponível.
             </p>
           )}
+
+          <DeviceSelector
+            devices={devices}
+            selectedDeviceId={selectedDeviceId}
+            ownDeviceId={ownDeviceId}
+            onSelect={setSelectedDeviceId}
+            onRefresh={refreshDevices}
+          />
 
           <NowPlayingCard track={radio.current} isPlaying={radio.isPlaying} isPremium={isPremium} />
 

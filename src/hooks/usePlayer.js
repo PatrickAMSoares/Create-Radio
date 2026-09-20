@@ -17,7 +17,7 @@ export function usePlayer(accessToken, isPremium) {
 
     function initPlayer() {
       const player = new window.Spotify.Player({
-        name: 'Rádio Pessoal',
+        name: 'Create Radio (navegador)',
         getOAuthToken: (cb) => cb(tokenRef.current),
         volume: 0.8,
       })
