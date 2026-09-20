@@ -3,7 +3,8 @@ export function Header({ profile, onDisconnect }) {
     <header className="app-header">
       <div className="brand">
         <span className="brand-mark" aria-hidden="true">🎧</span>
-        <span className="brand-name">Rádio Pessoal</span>
+        <span className="brand-name">Create Radio</span>
+        <span className="brand-tagline">a rádio com seu estilo</span>
       </div>
       <div className="account">
         <span className="status-pill status-pill--ok">Spotify conectado</span>
